@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>자동 포스팅</title>
+<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 1.4rem; }
+  fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  legend { font-weight: 600; padding: 0 6px; }
+  label { display: block; margin: 10px 0 4px; font-weight: 500; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
+  .site-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .site-row input[type=checkbox]:disabled + span { color: #999; }
+  .badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: #eee; margin-left: 6px; }
+  .badge.ok { background: #d7f4dd; color: #146c2e; }
+  .badge.no-session { background: #fde2e2; color: #a11; }
+  button[type=submit] { margin-top: 16px; padding: 10px 20px; font-size: 1rem; border: none; border-radius: 6px; background: #222; color: #fff; cursor: pointer; }
+  button[type=submit]:hover { background: #444; }
+  button[type=submit]:disabled { background: #aaa; cursor: not-allowed; }
+  .flash { padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+  .flash.success { background: #d7f4dd; color: #146c2e; }
+  .flash.error { background: #fde2e2; color: #a11; }
+  .flash a { color: inherit; }
+</style>
+</head>
+<body>
+  <h1>자동 포스팅</h1>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="flash {{ msg.level }}">{{ msg.text | safe }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <form action="/post" method="post" id="post-form">
+    <fieldset>
+      <legend>내용</legend>
+      <label for="title">제목</label>
+      <input type="text" id="title" name="title" required>
+
+      <label for="editor">본문 (사진을 에디터 안으로 끌어놓거나 붙여넣으면 바로 삽입됩니다)</label>
+      <div id="editor"></div>
+      <input type="hidden" name="content" id="content-hidden">
+    </fieldset>
+
+    <fieldset>
+      <legend>올릴 사이트</legend>
+      {% for site in sites %}
+        <div class="site-row">
+          <input type="checkbox" id="site-{{ site.id }}" name="sites" value="{{ site.id }}"
+                 {% if not site.has_session or not site.can_post %}disabled{% endif %}>
+          <label for="site-{{ site.id }}" style="margin:0; font-weight:400;">
+            <span>{{ site.name }}</span>
+          </label>
+          {% if not site.has_session %}
+            <span class="badge no-session">로그인 세션 없음 — scripts/login_{{ site.id }}.py 먼저 실행</span>
+          {% elif not site.can_post %}
+            <span class="badge">오늘 이미 게시함</span>
+          {% else %}
+            <span class="badge ok">게시 가능</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </fieldset>
+
+    <button type="submit" id="submit-btn">선택한 사이트에 게시</button>
+  </form>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
+  <script>
+    $(function () {
+      $('#editor').summernote({
+        lang: 'ko-KR',
+        height: 320,
+        placeholder: '내용을 입력하세요. 사진은 끌어놓거나 붙여넣으면 됩니다.',
+        toolbar: [
+          ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
+          ['para', ['ul', 'ol', 'paragraph']],
+          ['insert', ['picture', 'link']],
+          ['view', ['fullscreen', 'codeview']],
+        ],
+        // 사진은 별도 업로드 서버 없이 base64로 에디터 안에 바로 담는다.
+        // 실제 사이트에 올릴 때는 서버에서 이 base64를 꺼내 진짜 파일로 업로드한다.
+        callbacks: {
+          onImageUpload: function (files) {
+            for (let i = 0; i < files.length; i++) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                $('#editor').summernote('insertImage', e.target.result);
+              };
+              reader.readAsDataURL(files[i]);
+            }
+          },
+        },
+      });
+
+      $('#post-form').on('submit', function () {
+        $('#content-hidden').val($('#editor').summernote('code'));
+      });
+    });
+  </script>
+</body>
+</html>
