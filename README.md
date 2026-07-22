@@ -36,7 +36,13 @@ python autowrite.py
 
 ## 3. 최초 로그인 (사이트당 1회)
 
-브라우저 창이 뜨면 직접 로그인하고, 터미널로 돌아와 Enter를 누르면 세션(쿠키)이 저장됩니다.
+가장 간단한 방법: 웹 UI(4번, `python autowrite.py`)를 열면 세션이 없는 사이트는 체크박스 대신
+**"로그인하기" 버튼**이 보입니다. 버튼을 누르면 로그인용 브라우저 창이 자동으로 뜨고,
+직접 로그인한 뒤 웹 페이지에 나타나는 **"로그인 완료" 버튼**을 누르면 세션(쿠키)이 저장되고
+페이지가 새로고침됩니다. 터미널을 열거나 뭔가 입력할 필요가 전혀 없습니다.
+
+터미널에 익숙하다면 스크립트를 직접 실행해도 동일하게 동작합니다(이 경우엔 브라우저 창에서
+로그인한 뒤 터미널로 돌아와 Enter를 누르면 됩니다).
 
 ```bash
 python scripts/login_tistory.py
@@ -95,12 +101,33 @@ scripts/
   login_tistory.py       최초 로그인용
   login_dcinside.py       최초 로그인용
 templates/index.html     웹 UI
+build.spec             exe 빌드용 PyInstaller 스펙 (7번 참고)
 storage/
   sessions/               사이트별 로그인 세션(쿠키) 저장
   uploads/                업로드된 이미지 임시 저장
   post_log.json            하루 1건 제한 기록
   error_screenshots/       자동화 실패 시 디버깅용 스크린샷
 ```
+
+## 7. exe로 빌드하기 (다른 유저에게 배포)
+
+개발 환경(파이썬 설치됨)에서 아래 명령으로 `dist/AutoWrite.exe` 하나를 만들 수 있습니다.
+
+```bash
+pip install -r requirements.txt
+pip install pyinstaller
+pyinstaller build.spec
+```
+
+빌드가 끝나면 `dist/AutoWrite.exe`를 배포하면 됩니다. 사용하는 사람은 파이썬이나
+`pip install`을 몰라도 되고, 더블클릭만 하면 됩니다.
+
+**동작 방식**
+- 더블클릭하면 콘솔 창이 뜨며 서버가 켜지고, 1.5초 뒤 기본 브라우저로 웹 UI(`http://127.0.0.1:8000`)가 자동으로 열립니다.
+- Chromium 브라우저(사이트 자동 조작용)는 exe 안에 들어있지 않습니다. **최초 실행 시에만** 자동으로 내려받습니다(인터넷 연결 필요, 수 분 소요 가능). 이후 실행부터는 건너뜁니다.
+- `config.json`, `storage/`(로그인 세션, 업로드 이미지, 게시 로그, 에러 스크린샷)는 exe 파일이 있는 폴더를 기준으로 생성/유지됩니다. exe를 옮기면 이 파일들도 같이 옮겨야 설정과 로그인 세션이 유지됩니다.
+- 코드 서명을 하지 않았기 때문에 Windows Defender/SmartScreen이 "알 수 없는 게시자" 경고를 띄울 수 있습니다. "추가 정보 → 실행"으로 넘어가면 됩니다. (배포를 넓힐 계획이라면 나중에 코드 서명 인증서를 추가로 적용할 수 있습니다.)
+- 웹 UI 자체(jQuery/Summernote)는 CDN에서 불러오므로, 글 작성 화면을 쓰려면 인터넷 연결이 계속 필요합니다.
 
 ## 보안 메모
 

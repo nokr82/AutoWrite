@@ -10,6 +10,7 @@ import abc
 import datetime as dt
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable, Optional
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -38,20 +39,30 @@ class SiteAdapter(abc.ABC):
     def has_session(self) -> bool:
         return self.storage_state_path.exists()
 
-    def login_manually(self) -> None:
+    def login_manually(self, wait_for_user: Optional[Callable[[], None]] = None) -> None:
         """브라우저 창을 띄워 사용자가 직접 로그인하게 하고, 완료되면 세션(쿠키)을 저장한다.
 
         비밀번호는 이 프로그램에 저장되지 않는다 — 로그인 후 쿠키만 저장된다.
+
+        wait_for_user: 로그인 완료 신호를 기다리는 콜백. 넘기지 않으면(터미널에서
+        scripts/login_*.py를 직접 실행하는 경우) 기존처럼 콘솔에서 Enter를 누를 때까지
+        기다린다. 웹 UI(autowrite.py의 /login/{site_id})에서 호출할 때는 터미널이
+        없는 일반 사용자를 위해 "로그인 완료" 버튼 클릭을 기다리는 콜백을 넘겨준다.
         """
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False)
             context = browser.new_context()
             page = context.new_page()
             page.goto(self.login_url)
-            print(f"[{self.site_name}] 브라우저 창에서 로그인을 완료한 뒤, 이 터미널에서 Enter를 누르세요.")
-            input()
-            context.storage_state(path=str(self.storage_state_path))
-            browser.close()
+            try:
+                if wait_for_user is not None:
+                    wait_for_user()
+                else:
+                    print(f"[{self.site_name}] 브라우저 창에서 로그인을 완료한 뒤, 이 터미널에서 Enter를 누르세요.")
+                    input()
+                context.storage_state(path=str(self.storage_state_path))
+            finally:
+                browser.close()
         print(f"[{self.site_name}] 세션 저장 완료: {self.storage_state_path}")
 
     def post(self, content: PostContent, headless: bool = False) -> str:

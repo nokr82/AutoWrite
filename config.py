@@ -5,9 +5,16 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+# PyInstaller로 exe를 만들면 onefile 모드에서 __file__은 실행할 때마다 새로 풀리는
+# 임시 폴더(_MEIPASS)를 가리켜서 실행할 때마다 사라진다. config.json / storage/ 처럼
+# 계속 남아있어야 하는 데이터는 실제 exe 파일이 있는 폴더를 기준으로 잡아야 한다.
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config.json"
 SESSION_DIR = BASE_DIR / "storage" / "sessions"
 UPLOAD_DIR = BASE_DIR / "storage" / "uploads"

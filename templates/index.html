@@ -23,6 +23,13 @@
   .flash.success { background: #d7f4dd; color: #146c2e; }
   .flash.error { background: #fde2e2; color: #a11; }
   .flash a { color: inherit; }
+  .login-btn { padding: 5px 10px; font-size: 0.85rem; border: 1px solid #a11; border-radius: 6px; background: #fff; color: #a11; cursor: pointer; }
+  .login-btn:hover { background: #fde2e2; }
+  .login-btn:disabled { border-color: #ccc; color: #999; cursor: not-allowed; background: #f5f5f5; }
+  .login-confirm-btn { padding: 5px 10px; font-size: 0.85rem; border: 1px solid #146c2e; border-radius: 6px; background: #d7f4dd; color: #146c2e; cursor: pointer; font-weight: 600; }
+  .login-confirm-btn:hover { background: #bdeecb; }
+  .login-confirm-btn:disabled { border-color: #ccc; color: #999; cursor: not-allowed; background: #f5f5f5; }
+  .login-status { font-size: 0.8rem; color: #666; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -49,17 +56,24 @@
       <legend>올릴 사이트</legend>
       {% for site in sites %}
         <div class="site-row">
-          <input type="checkbox" id="site-{{ site.id }}" name="sites" value="{{ site.id }}"
-                 {% if not site.has_session or not site.can_post %}disabled{% endif %}>
-          <label for="site-{{ site.id }}" style="margin:0; font-weight:400;">
-            <span>{{ site.name }}</span>
-          </label>
           {% if not site.has_session %}
-            <span class="badge no-session">로그인 세션 없음 — scripts/login_{{ site.id }}.py 먼저 실행</span>
-          {% elif not site.can_post %}
-            <span class="badge">오늘 이미 게시함</span>
+            <input type="checkbox" disabled>
+            <label style="margin:0; font-weight:400; color:#999;"><span>{{ site.name }}</span></label>
+            <button type="button" class="login-btn" data-site="{{ site.id }}" data-name="{{ site.name }}">로그인하기</button>
+            <button type="button" class="login-confirm-btn" data-site="{{ site.id }}" style="display:none;">로그인 완료</button>
+            <span class="badge no-session">로그인 세션 없음 — 버튼을 누르면 로그인 창이 열립니다</span>
+            <span class="login-status" data-site-status="{{ site.id }}"></span>
           {% else %}
-            <span class="badge ok">게시 가능</span>
+            <input type="checkbox" id="site-{{ site.id }}" name="sites" value="{{ site.id }}"
+                   {% if not site.can_post %}disabled{% endif %}>
+            <label for="site-{{ site.id }}" style="margin:0; font-weight:400;">
+              <span>{{ site.name }}</span>
+            </label>
+            {% if not site.can_post %}
+              <span class="badge">오늘 이미 게시함</span>
+            {% else %}
+              <span class="badge ok">게시 가능</span>
+            {% endif %}
           {% endif %}
         </div>
       {% endfor %}
@@ -99,6 +113,58 @@
 
       $('#post-form').on('submit', function () {
         $('#content-hidden').val($('#editor').summernote('code'));
+      });
+
+      // 세션이 없는 사이트의 '로그인하기' 버튼 — 누르면 서버가 해당 사이트 로그인용
+      // 브라우저 창을 자동으로 띄운다. 터미널은 전혀 몰라도 되고, 로그인을 마친 뒤
+      // 이 페이지에 나타나는 '로그인 완료' 버튼만 누르면 세션(쿠키)이 저장되고
+      // 페이지가 자동으로 새로고침된다.
+      $('.login-btn').on('click', function () {
+        const btn = $(this);
+        const siteId = btn.data('site');
+        const siteName = btn.data('name');
+        const status = $(`.login-status[data-site-status="${siteId}"]`);
+        const confirmBtn = $(`.login-confirm-btn[data-site="${siteId}"]`);
+
+        btn.prop('disabled', true);
+        confirmBtn.show().prop('disabled', false);
+        status.text(`[${siteName}] 로그인 창이 열렸습니다. 로그인을 마친 뒤 '로그인 완료' 버튼을 눌러주세요.`);
+
+        // 이 요청은 사용자가 '로그인 완료'를 눌러 /login/{siteId}/confirm 을 호출할
+        // 때까지 서버에서 응답하지 않고 대기한다 (최대 5분).
+        fetch(`/login/${siteId}`, { method: 'POST' })
+          .then((res) => res.json())
+          .then((data) => {
+            confirmBtn.hide();
+            if (data.ok) {
+              status.text(`[${siteName}] 로그인 완료 — 새로고침합니다...`);
+              location.reload();
+            } else {
+              status.text(`[${siteName}] 로그인 실패: ${data.error}`);
+              btn.prop('disabled', false);
+            }
+          })
+          .catch(() => {
+            confirmBtn.hide();
+            status.text(`[${siteName}] 로그인 처리 중 오류가 발생했습니다.`);
+            btn.prop('disabled', false);
+          });
+      });
+
+      // '로그인 완료' 버튼 — 위 fetch가 대기 중인 /login/{siteId} 요청을 깨워서
+      // 세션 저장(context.storage_state)과 브라우저 창 닫기를 진행시킨다.
+      $('.login-confirm-btn').on('click', function () {
+        const btn = $(this);
+        const siteId = btn.data('site');
+        const status = $(`.login-status[data-site-status="${siteId}"]`);
+
+        btn.prop('disabled', true);
+        status.text('로그인 완료를 확인하는 중입니다...');
+
+        fetch(`/login/${siteId}/confirm`, { method: 'POST' }).catch(() => {
+          status.text('확인 요청에 실패했습니다. 다시 시도해주세요.');
+          btn.prop('disabled', false);
+        });
       });
     });
   </script>

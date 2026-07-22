@@ -1,6 +1,10 @@
 __pycache__/
 *.pyc
 
+# PyInstaller 빌드 산출물 (build.spec으로 만든 exe/중간 파일)
+build/
+dist/
+
 # 로그인 세션(쿠키), 업로드 이미지, 게시 로그, 에러 스크린샷 — 개인 계정 정보라 절대 커밋하지 않음
 storage/
 
