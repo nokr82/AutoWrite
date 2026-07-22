@@ -30,7 +30,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from config import SESSION_DIR, UPLOAD_DIR, load_config
+from config import SESSION_DIR, UPLOAD_DIR, load_config, save_config
 from postlog import can_post_today, mark_posted
 from sites import SITE_ADAPTERS, PostContent
 
@@ -97,6 +97,48 @@ def _site_status() -> list[dict]:
 def index(request: Request):
     return templates.TemplateResponse(
         request, "index.html", {"sites": _site_status(), "messages": []}
+    )
+
+
+def _load_config_safe() -> dict:
+    """설정 화면에서 쓰는 load_config 래퍼.
+
+    config.json이 아직 없으면 load_config()가 기본 템플릿을 만들면서 RuntimeError를
+    던지는데(콘솔용 안내 메시지), 설정 화면에서는 그 템플릿을 그냥 다시 읽어서 보여준다.
+    """
+    try:
+        return load_config()
+    except RuntimeError:
+        return load_config()
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    return templates.TemplateResponse(
+        request, "settings.html", {"cfg": _load_config_safe(), "messages": []}
+    )
+
+
+@app.post("/settings", response_class=HTMLResponse)
+def settings_save(
+    request: Request,
+    tistory_blog_name: str = Form(""),
+    tistory_category_name: str = Form(""),
+    dcinside_gallery_id: str = Form(""),
+    dcinside_gallery_type: str = Form("major"),
+    daily_limit: str = Form("N"),  # 체크박스 미체크 시 폼에서 아예 빠지므로 기본값은 "N"
+):
+    cfg = _load_config_safe()
+    cfg["tistory"]["blog_name"] = tistory_blog_name.strip()
+    cfg["tistory"]["category_name"] = tistory_category_name.strip()
+    cfg["dcinside"]["gallery_id"] = dcinside_gallery_id.strip()
+    cfg["dcinside"]["gallery_type"] = dcinside_gallery_type
+    cfg["daily_limit"] = daily_limit
+    save_config(cfg)
+    return templates.TemplateResponse(
+        request,
+        "settings.html",
+        {"cfg": cfg, "messages": [{"level": "success", "text": "설정을 저장했습니다."}]},
     )
 
 
