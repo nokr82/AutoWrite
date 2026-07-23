@@ -46,6 +46,12 @@ class DcInsideAdapter(SiteAdapter):
     site_id = "dcinside"
     site_name = "디시인사이드"
 
+    def __init__(self, session_dir, debug: bool = False, gallery: dict | None = None):
+        super().__init__(session_dir, debug=debug)
+        # 게시 대상 갤러리(gallery_id/gallery_type). 넘기지 않으면(로그인 등 갤러리와
+        # 무관한 용도) _write_url()이 config.json의 첫 갤러리로 폴백한다.
+        self.gallery = gallery
+
     @property
     def login_url(self) -> str:
         return "https://www.dcinside.com/"
@@ -56,11 +62,14 @@ class DcInsideAdapter(SiteAdapter):
         return {**DEFAULT_SELECTORS, **overrides}
 
     def _write_url(self) -> str:
-        cfg = load_config()
-        gallery_id = cfg["dcinside"]["gallery_id"]
+        gallery = self.gallery
+        if gallery is None:
+            galleries = load_config()["dcinside"]["galleries"]
+            gallery = galleries[0] if galleries else {}
+        gallery_id = gallery.get("gallery_id", "")
         if not gallery_id or "여기에" in gallery_id:
-            raise RuntimeError("config.json 의 dcinside.gallery_id 를 먼저 설정하세요.")
-        gallery_type = cfg["dcinside"].get("gallery_type", "major")
+            raise RuntimeError("config.json 의 dcinside.galleries 에 갤러리를 먼저 설정하세요.")
+        gallery_type = gallery.get("gallery_type", "major")
         path = "mgallery/board/write" if gallery_type == "minor" else "board/write"
         return f"https://gall.dcinside.com/{path}/?id={gallery_id}"
 

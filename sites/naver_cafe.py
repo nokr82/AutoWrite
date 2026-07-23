@@ -95,6 +95,12 @@ class NaverCafeAdapter(SiteAdapter):
     site_id = "naver_cafe"
     site_name = "네이버 카페"
 
+    def __init__(self, session_dir, debug: bool = False, board: dict | None = None):
+        super().__init__(session_dir, debug=debug)
+        # 게시 대상 게시판(club_id/menu_id). 넘기지 않으면(로그인 등 게시판과 무관한
+        # 용도) _write_url()이 config.json의 첫 게시판으로 폴백한다.
+        self.board = board
+
     @property
     def login_url(self) -> str:
         return "https://nid.naver.com/nidlogin.login"
@@ -105,13 +111,16 @@ class NaverCafeAdapter(SiteAdapter):
         return {**DEFAULT_SELECTORS, **overrides}
 
     def _write_url(self) -> str:
-        cfg = load_config()
-        club_id = cfg["naver_cafe"]["club_id"]
-        menu_id = cfg["naver_cafe"]["menu_id"]
+        board = self.board
+        if board is None:
+            boards = load_config()["naver_cafe"]["boards"]
+            board = boards[0] if boards else {}
+        club_id = board.get("club_id", "")
+        menu_id = board.get("menu_id", "")
         if not club_id or "여기에" in club_id:
-            raise RuntimeError("config.json 의 naver_cafe.club_id 를 먼저 설정하세요.")
+            raise RuntimeError("config.json 의 naver_cafe.boards 에 club_id 를 먼저 설정하세요.")
         if not menu_id or "여기에" in menu_id:
-            raise RuntimeError("config.json 의 naver_cafe.menu_id 를 먼저 설정하세요.")
+            raise RuntimeError("config.json 의 naver_cafe.boards 에 menu_id 를 먼저 설정하세요.")
         return f"https://cafe.naver.com/ca-fe/cafes/{club_id}/menus/{menu_id}/articles/write"
 
     def _upload_image_at_cursor(self, page: Page, sel: dict, image_path) -> None:

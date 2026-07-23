@@ -89,14 +89,58 @@ except RuntimeError as e:
 
 
 def _site_status() -> list[dict]:
+    """글쓰기 화면 체크박스 목록에 넣을 게시 대상 목록.
+
+    로그인은 사이트(계정) 단위라 세션이 없으면 site_id 하나로 로그인 행을 만든다.
+    디시인사이드/네이버 카페는 세션이 있으면 config.json의 galleries/boards를 각각
+    풀어서 "dcinside:{gallery_id}", "naver_cafe:{club_id}:{menu_id}" 합성 id로
+    별도 행을 만든다(같은 사이트 안 여러 곳에 동시 게시하기 위함).
+    """
     statuses = []
     for site_id, adapter_cls in SITE_ADAPTERS.items():
         adapter = adapter_cls(session_dir=SESSION_DIR)
+        has_session = adapter.has_session()
+
+        if has_session and site_id == "dcinside":
+            galleries = load_config()["dcinside"]["galleries"]
+            for gallery in galleries:
+                gallery_id = gallery.get("gallery_id", "")
+                if not gallery_id or "여기에" in gallery_id:
+                    continue
+                target_id = f"dcinside:{gallery_id}"
+                statuses.append(
+                    {
+                        "id": target_id,
+                        "name": f"{adapter.site_name} - {gallery.get('label') or gallery_id}",
+                        "has_session": True,
+                        "can_post": can_post_today(target_id),
+                    }
+                )
+            continue
+
+        if has_session and site_id == "naver_cafe":
+            boards = load_config()["naver_cafe"]["boards"]
+            for board in boards:
+                club_id = board.get("club_id", "")
+                menu_id = board.get("menu_id", "")
+                if not club_id or "여기에" in club_id or not menu_id or "여기에" in menu_id:
+                    continue
+                target_id = f"naver_cafe:{club_id}:{menu_id}"
+                statuses.append(
+                    {
+                        "id": target_id,
+                        "name": f"{adapter.site_name} - {board.get('label') or f'{club_id}:{menu_id}'}",
+                        "has_session": True,
+                        "can_post": can_post_today(target_id),
+                    }
+                )
+            continue
+
         statuses.append(
             {
                 "id": site_id,
                 "name": adapter.site_name,
-                "has_session": adapter.has_session(),
+                "has_session": has_session,
                 "can_post": can_post_today(site_id),
             }
         )
@@ -134,19 +178,44 @@ def settings_save(
     request: Request,
     tistory_blog_name: str = Form(""),
     tistory_category_name: str = Form(""),
-    dcinside_gallery_id: str = Form(""),
-    dcinside_gallery_type: str = Form("major"),
-    naver_cafe_club_id: str = Form(""),
-    naver_cafe_menu_id: str = Form(""),
+    dcinside_gallery_id: list[str] = Form(default=[]),
+    dcinside_gallery_label: list[str] = Form(default=[]),
+    dcinside_gallery_type: list[str] = Form(default=[]),
+    naver_cafe_club_id: list[str] = Form(default=[]),
+    naver_cafe_menu_id: list[str] = Form(default=[]),
+    naver_cafe_label: list[str] = Form(default=[]),
     daily_limit: str = Form("N"),  # 체크박스 미체크 시 폼에서 아예 빠지므로 기본값은 "N"
 ):
     cfg = _load_config_safe()
     cfg["tistory"]["blog_name"] = tistory_blog_name.strip()
     cfg["tistory"]["category_name"] = tistory_category_name.strip()
-    cfg["dcinside"]["gallery_id"] = dcinside_gallery_id.strip()
-    cfg["dcinside"]["gallery_type"] = dcinside_gallery_type
-    cfg["naver_cafe"]["club_id"] = naver_cafe_club_id.strip()
-    cfg["naver_cafe"]["menu_id"] = naver_cafe_menu_id.strip()
+
+    # 갤러리 행(ID/표시이름/종류)은 같은 순서로 나란히 제출된다. ID가 빈 행은 버린다.
+    galleries = [
+        {"gallery_id": gid.strip(), "gallery_type": gtype, "label": label.strip()}
+        for gid, label, gtype in zip(dcinside_gallery_id, dcinside_gallery_label, dcinside_gallery_type)
+        if gid.strip()
+    ]
+    if not galleries:
+        galleries = [{"gallery_id": "여기에_갤러리ID_입력", "gallery_type": "major", "label": ""}]
+    cfg["dcinside"]["galleries"] = galleries
+
+    # 게시판 행(카페 club_id/게시판 menu_id/표시이름)도 같은 방식으로 처리한다.
+    boards = [
+        {"club_id": club.strip(), "menu_id": menu.strip(), "label": label.strip()}
+        for club, menu, label in zip(naver_cafe_club_id, naver_cafe_menu_id, naver_cafe_label)
+        if club.strip() and menu.strip()
+    ]
+    if not boards:
+        boards = [
+            {
+                "club_id": "여기에_카페_club_id_입력",
+                "menu_id": "여기에_게시판_menu_id_입력",
+                "label": "",
+            }
+        ]
+    cfg["naver_cafe"]["boards"] = boards
+
     cfg["daily_limit"] = daily_limit
     save_config(cfg)
     return templates.TemplateResponse(
@@ -230,31 +299,55 @@ def post(
     body_html, image_paths = _extract_embedded_images(content, req_dir)
     post_content = PostContent(title=title, body=body_html, image_paths=image_paths)
 
-    for site_id in sites:
+    for target_id in sites:
+        # "dcinside:programming", "naver_cafe:30457160:16"처럼 하위 게시 대상이 붙은
+        # 합성 id일 수 있다 (사이트 자체 id에는 콜론이 없으므로 partition 결과
+        # target_key가 비어있으면 일반 사이트 게시).
+        site_id, _, target_key = target_id.partition(":")
         adapter_cls = SITE_ADAPTERS.get(site_id)
         if adapter_cls is None:
             messages.append({"level": "error", "text": f"알 수 없는 사이트: {site_id}"})
             continue
 
-        adapter = adapter_cls(session_dir=SESSION_DIR)
+        if target_key and site_id == "dcinside":
+            galleries = load_config()["dcinside"]["galleries"]
+            gallery = next((g for g in galleries if g.get("gallery_id") == target_key), None)
+            if gallery is None:
+                messages.append({"level": "error", "text": f"알 수 없는 갤러리: {target_key}"})
+                continue
+            adapter = adapter_cls(session_dir=SESSION_DIR, gallery=gallery)
+            display_name = f"{adapter.site_name} - {gallery.get('label') or target_key}"
+        elif target_key and site_id == "naver_cafe":
+            boards = load_config()["naver_cafe"]["boards"]
+            board = next(
+                (b for b in boards if f"{b.get('club_id')}:{b.get('menu_id')}" == target_key), None
+            )
+            if board is None:
+                messages.append({"level": "error", "text": f"알 수 없는 게시판: {target_key}"})
+                continue
+            adapter = adapter_cls(session_dir=SESSION_DIR, board=board)
+            display_name = f"{adapter.site_name} - {board.get('label') or target_key}"
+        else:
+            adapter = adapter_cls(session_dir=SESSION_DIR)
+            display_name = adapter.site_name
 
         if not adapter.has_session():
             messages.append(
-                {"level": "error", "text": f"[{adapter.site_name}] 로그인 세션이 없습니다. 먼저 로그인 스크립트를 실행하세요."}
+                {"level": "error", "text": f"[{display_name}] 로그인 세션이 없습니다. 먼저 로그인 스크립트를 실행하세요."}
             )
             continue
-        if not can_post_today(site_id):
-            messages.append({"level": "error", "text": f"[{adapter.site_name}] 오늘 이미 게시했습니다 (사이트당 하루 1건)."})
+        if not can_post_today(target_id):
+            messages.append({"level": "error", "text": f"[{display_name}] 오늘 이미 게시했습니다 (사이트당 하루 1건)."})
             continue
 
         try:
             url = adapter.post(post_content, headless=False)
-            mark_posted(site_id)
+            mark_posted(target_id)
             messages.append(
-                {"level": "success", "text": f"[{adapter.site_name}] 게시 완료: <a href='{url}' target='_blank'>{url}</a>"}
+                {"level": "success", "text": f"[{display_name}] 게시 완료: <a href='{url}' target='_blank'>{url}</a>"}
             )
         except Exception as e:
-            messages.append({"level": "error", "text": f"[{adapter.site_name}] 게시 실패: {e}"})
+            messages.append({"level": "error", "text": f"[{display_name}] 게시 실패: {e}"})
 
     return templates.TemplateResponse(
         request,

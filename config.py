@@ -36,16 +36,30 @@ DEFAULT_CONFIG = {
         "category_name": "",  # 비워두면 기본 카테고리 사용
     },
     "dcinside": {
-        # 갤러리 주소의 id 파라미터. 예: gall.dcinside.com/board/lists/?id=programming
-        "gallery_id": "여기에_갤러리ID_입력",
-        # 마이너 갤러리면 "minor", 정식 갤러리면 "major"
-        "gallery_type": "major",
+        # 여러 갤러리에 동시 게시할 수 있도록 리스트로 관리한다.
+        "galleries": [
+            {
+                # 갤러리 주소의 id 파라미터. 예: gall.dcinside.com/board/lists/?id=programming
+                "gallery_id": "여기에_갤러리ID_입력",
+                # 마이너 갤러리면 "minor", 정식 갤러리면 "major"
+                "gallery_type": "major",
+                # 글쓰기 화면 목록에 표시할 이름(선택). 비워두면 gallery_id를 그대로 표시.
+                "label": "",
+            },
+        ],
     },
     "naver_cafe": {
-        # 카페 접속 시 주소의 숫자 ID. 예: cafe.naver.com/ca-fe/cafes/12345678/... 의 12345678
-        "club_id": "여기에_카페_club_id_입력",
-        # 게시판(메뉴) ID. 카페에서 글을 쓸 게시판으로 들어가면 주소의 menus/ 뒤에 오는 숫자
-        "menu_id": "여기에_게시판_menu_id_입력",
+        # 여러 게시판(다른 카페 포함)에 동시 게시할 수 있도록 리스트로 관리한다.
+        "boards": [
+            {
+                # 카페 접속 시 주소의 숫자 ID. 예: cafe.naver.com/ca-fe/cafes/12345678/... 의 12345678
+                "club_id": "여기에_카페_club_id_입력",
+                # 게시판(메뉴) ID. 카페에서 글을 쓸 게시판으로 들어가면 주소의 menus/ 뒤에 오는 숫자
+                "menu_id": "여기에_게시판_menu_id_입력",
+                # 글쓰기 화면 목록에 표시할 이름(선택). 비워두면 club_id:menu_id로 표시.
+                "label": "",
+            },
+        ],
     },
     # 사이트별 셀렉터를 덮어쓰고 싶을 때 사용 (사이트 개편으로 셀렉터가 깨졌을 때 여기만 수정)
     "selectors": {},
@@ -69,6 +83,32 @@ def load_config() -> dict:
         if key not in cfg:
             cfg[key] = default_value
             changed = True
+    # 예전 버전은 갤러리를 gallery_id/gallery_type 스칼라 값 하나로 저장했다. galleries
+    # 리스트가 없으면(이전 config.json) 기존 값을 잃지 않도록 리스트의 첫 항목으로 옮긴다.
+    dcinside_cfg = cfg.get("dcinside", {})
+    if "galleries" not in dcinside_cfg:
+        dcinside_cfg["galleries"] = [
+            {
+                "gallery_id": dcinside_cfg.pop("gallery_id", "여기에_갤러리ID_입력"),
+                "gallery_type": dcinside_cfg.pop("gallery_type", "major"),
+                "label": "",
+            }
+        ]
+        cfg["dcinside"] = dcinside_cfg
+        changed = True
+    # naver_cafe도 마찬가지로 예전에는 club_id/menu_id 스칼라 값 하나였다.
+    naver_cafe_cfg = cfg.get("naver_cafe", {})
+    if "boards" not in naver_cafe_cfg:
+        naver_cafe_cfg["boards"] = [
+            {
+                "club_id": naver_cafe_cfg.pop("club_id", "여기에_카페_club_id_입력"),
+                "menu_id": naver_cafe_cfg.pop("menu_id", "여기에_게시판_menu_id_입력"),
+                "label": "",
+            }
+        ]
+        cfg["naver_cafe"] = naver_cafe_cfg
+        changed = True
+
     if changed:
         save_config(cfg)
 

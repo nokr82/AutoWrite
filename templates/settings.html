@@ -143,6 +143,45 @@
   .checkbox-row label { margin: 0; font-weight: 500; }
   .checkbox-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 
+  .gallery-row {
+    padding: 14px 14px 4px;
+    margin: 14px 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  .gallery-row:first-child { margin-top: 4px; }
+
+  .remove-gallery-btn, .remove-board-btn {
+    margin: 14px 0 10px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid var(--error-text);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--error-text);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .remove-gallery-btn:hover, .remove-board-btn:hover { background: var(--error-bg); transform: translateY(-1px); }
+
+  #add-gallery-btn, #add-board-btn {
+    margin-top: 4px;
+    padding: 8px 16px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  #add-gallery-btn:hover, #add-board-btn:hover { background: var(--accent-soft); transform: translateY(-1px); }
+
   button[type=submit] {
     margin-top: 20px;
     padding: 12px 26px;
@@ -199,33 +238,97 @@
 
     <fieldset>
       <legend>디시인사이드</legend>
-      <label for="dcinside_gallery_id">갤러리 ID</label>
-      <input type="text" id="dcinside_gallery_id" name="dcinside_gallery_id"
-             value="{{ '' if '여기에' in cfg.dcinside.gallery_id else cfg.dcinside.gallery_id }}"
-             placeholder="예: programming">
-      <small class="hint">갤러리 주소의 id= 뒤에 오는 값입니다. (gall.dcinside.com/board/lists/?id=programming)</small>
+      <small class="hint">여러 갤러리를 등록하면 글쓰기 화면에서 갤러리별로 골라 동시에 게시할 수 있습니다.</small>
+      <div id="dcinside-galleries">
+        {% for gallery in cfg.dcinside.galleries %}
+          <div class="gallery-row" data-gallery-row>
+            <label>갤러리 ID</label>
+            <input type="text" name="dcinside_gallery_id"
+                   value="{{ '' if '여기에' in gallery.gallery_id else gallery.gallery_id }}"
+                   placeholder="예: programming">
+            <small class="hint">갤러리 주소의 id= 뒤에 오는 값입니다. (gall.dcinside.com/board/lists/?id=programming)</small>
 
-      <label for="dcinside_gallery_type">갤러리 종류</label>
-      <select id="dcinside_gallery_type" name="dcinside_gallery_type">
-        <option value="major" {% if cfg.dcinside.gallery_type != "minor" %}selected{% endif %}>정식 갤러리</option>
-        <option value="minor" {% if cfg.dcinside.gallery_type == "minor" %}selected{% endif %}>마이너 갤러리</option>
-      </select>
+            <label>표시 이름 (선택)</label>
+            <input type="text" name="dcinside_gallery_label" value="{{ gallery.label or '' }}"
+                   placeholder="비우면 갤러리 ID로 표시">
+
+            <label>갤러리 종류</label>
+            <select name="dcinside_gallery_type">
+              <option value="major" {% if gallery.gallery_type != "minor" %}selected{% endif %}>정식 갤러리</option>
+              <option value="minor" {% if gallery.gallery_type == "minor" %}selected{% endif %}>마이너 갤러리</option>
+            </select>
+
+            <button type="button" class="remove-gallery-btn">이 갤러리 삭제</button>
+          </div>
+        {% endfor %}
+      </div>
+      <button type="button" id="add-gallery-btn">+ 갤러리 추가</button>
     </fieldset>
+
+    <template id="gallery-row-template">
+      <div class="gallery-row" data-gallery-row>
+        <label>갤러리 ID</label>
+        <input type="text" name="dcinside_gallery_id" placeholder="예: programming">
+        <small class="hint">갤러리 주소의 id= 뒤에 오는 값입니다. (gall.dcinside.com/board/lists/?id=programming)</small>
+
+        <label>표시 이름 (선택)</label>
+        <input type="text" name="dcinside_gallery_label" placeholder="비우면 갤러리 ID로 표시">
+
+        <label>갤러리 종류</label>
+        <select name="dcinside_gallery_type">
+          <option value="major" selected>정식 갤러리</option>
+          <option value="minor">마이너 갤러리</option>
+        </select>
+
+        <button type="button" class="remove-gallery-btn">이 갤러리 삭제</button>
+      </div>
+    </template>
 
     <fieldset>
       <legend>네이버 카페</legend>
-      <label for="naver_cafe_club_id">카페 club_id</label>
-      <input type="text" id="naver_cafe_club_id" name="naver_cafe_club_id"
-             value="{{ '' if '여기에' in cfg.naver_cafe.club_id else cfg.naver_cafe.club_id }}"
-             placeholder="예: 12345678">
-      <small class="hint">카페 안에서 아무 게시판이나 들어가면 주소의 cafes/ 뒤에 오는 숫자입니다. (cafe.naver.com/ca-fe/cafes/12345678/...)</small>
+      <small class="hint">여러 게시판(다른 카페 포함)을 등록하면 글쓰기 화면에서 골라 동시에 게시할 수 있습니다.</small>
+      <div id="naver-cafe-boards">
+        {% for board in cfg.naver_cafe.boards %}
+          <div class="gallery-row" data-board-row>
+            <label>카페 club_id</label>
+            <input type="text" name="naver_cafe_club_id"
+                   value="{{ '' if '여기에' in board.club_id else board.club_id }}"
+                   placeholder="예: 12345678">
+            <small class="hint">카페 안에서 아무 게시판이나 들어가면 주소의 cafes/ 뒤에 오는 숫자입니다. (cafe.naver.com/ca-fe/cafes/12345678/...)</small>
 
-      <label for="naver_cafe_menu_id">게시판 menu_id</label>
-      <input type="text" id="naver_cafe_menu_id" name="naver_cafe_menu_id"
-             value="{{ '' if '여기에' in cfg.naver_cafe.menu_id else cfg.naver_cafe.menu_id }}"
-             placeholder="예: 1">
-      <small class="hint">글을 올릴 게시판으로 들어가면 주소의 menus/ 뒤에 오는 숫자입니다.</small>
+            <label>게시판 menu_id</label>
+            <input type="text" name="naver_cafe_menu_id"
+                   value="{{ '' if '여기에' in board.menu_id else board.menu_id }}"
+                   placeholder="예: 1">
+            <small class="hint">글을 올릴 게시판으로 들어가면 주소의 menus/ 뒤에 오는 숫자입니다.</small>
+
+            <label>표시 이름 (선택)</label>
+            <input type="text" name="naver_cafe_label" value="{{ board.label or '' }}"
+                   placeholder="비우면 club_id:menu_id로 표시">
+
+            <button type="button" class="remove-board-btn">이 게시판 삭제</button>
+          </div>
+        {% endfor %}
+      </div>
+      <button type="button" id="add-board-btn">+ 게시판 추가</button>
     </fieldset>
+
+    <template id="board-row-template">
+      <div class="gallery-row" data-board-row>
+        <label>카페 club_id</label>
+        <input type="text" name="naver_cafe_club_id" placeholder="예: 12345678">
+        <small class="hint">카페 안에서 아무 게시판이나 들어가면 주소의 cafes/ 뒤에 오는 숫자입니다. (cafe.naver.com/ca-fe/cafes/12345678/...)</small>
+
+        <label>게시판 menu_id</label>
+        <input type="text" name="naver_cafe_menu_id" placeholder="예: 1">
+        <small class="hint">글을 올릴 게시판으로 들어가면 주소의 menus/ 뒤에 오는 숫자입니다.</small>
+
+        <label>표시 이름 (선택)</label>
+        <input type="text" name="naver_cafe_label" placeholder="비우면 club_id:menu_id로 표시">
+
+        <button type="button" class="remove-board-btn">이 게시판 삭제</button>
+      </div>
+    </template>
 
     <fieldset>
       <legend>게시 제한</legend>
@@ -237,5 +340,29 @@
 
     <button type="submit">저장</button>
   </form>
+
+  <script>
+    document.getElementById('add-gallery-btn').addEventListener('click', function () {
+      const template = document.getElementById('gallery-row-template');
+      document.getElementById('dcinside-galleries').appendChild(template.content.cloneNode(true));
+    });
+
+    document.getElementById('dcinside-galleries').addEventListener('click', function (e) {
+      if (e.target.classList.contains('remove-gallery-btn')) {
+        e.target.closest('[data-gallery-row]').remove();
+      }
+    });
+
+    document.getElementById('add-board-btn').addEventListener('click', function () {
+      const template = document.getElementById('board-row-template');
+      document.getElementById('naver-cafe-boards').appendChild(template.content.cloneNode(true));
+    });
+
+    document.getElementById('naver-cafe-boards').addEventListener('click', function (e) {
+      if (e.target.classList.contains('remove-board-btn')) {
+        e.target.closest('[data-board-row]').remove();
+      }
+    });
+  </script>
 </body>
 </html>
