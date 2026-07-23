@@ -3,28 +3,178 @@
 <head>
 <meta charset="UTF-8">
 <title>설정 - 자동 포스팅</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
 <style>
-  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; color: #222; }
-  h1 { font-size: 1.4rem; }
-  a.back { display: inline-block; margin-bottom: 16px; color: #555; text-decoration: none; }
-  a.back:hover { text-decoration: underline; }
-  fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-  legend { font-weight: 600; padding: 0 6px; }
-  label { display: block; margin: 10px 0 4px; font-weight: 500; }
-  small.hint { display: block; color: #888; font-weight: 400; margin-top: 2px; }
-  input[type=text] { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
-  select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
-  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-  .checkbox-row label { margin: 0; font-weight: 400; }
-  button[type=submit] { margin-top: 16px; padding: 10px 20px; font-size: 1rem; border: none; border-radius: 6px; background: #222; color: #fff; cursor: pointer; }
-  button[type=submit]:hover { background: #444; }
-  .flash { padding: 12px; border-radius: 6px; margin-bottom: 16px; }
-  .flash.success { background: #d7f4dd; color: #146c2e; }
-  .flash.error { background: #fde2e2; color: #a11; }
+  :root {
+    --bg: #f6f2ea;
+    --bg-accent-1: rgba(177, 71, 31, 0.07);
+    --bg-accent-2: rgba(177, 71, 31, 0.05);
+    --surface: #fffdfa;
+    --surface-2: #faf5eb;
+    --border: #e7ddcc;
+    --text: #2a241c;
+    --text-muted: #8f8371;
+    --accent: #b1471f;
+    --accent-strong: #8a3616;
+    --accent-soft: #f2ddce;
+    --success-bg: #e2f1e3;
+    --success-text: #1f6b39;
+    --success-border: #bfe3c5;
+    --error-bg: #fbe6e1;
+    --error-text: #a23a1d;
+    --error-border: #f0c3b6;
+    --shadow-sm: 0 1px 2px rgba(30, 20, 5, 0.05);
+    --radius: 14px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #19160f;
+      --bg-accent-1: rgba(224, 138, 92, 0.09);
+      --bg-accent-2: rgba(224, 138, 92, 0.05);
+      --surface: #241f16;
+      --surface-2: #2b2418;
+      --border: #3c3324;
+      --text: #f1e9db;
+      --text-muted: #a89a84;
+      --accent: #e08a5c;
+      --accent-strong: #f2ac81;
+      --accent-soft: #3c2a1c;
+      --success-bg: #1d3325;
+      --success-text: #8fd6a0;
+      --success-border: #2c4a34;
+      --error-bg: #3a231d;
+      --error-text: #f0a58c;
+      --error-border: #5a352a;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'PretendardVariable', -apple-system, "Malgun Gothic", sans-serif;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+    color: var(--text);
+    background:
+      radial-gradient(720px 360px at 100% -8%, var(--bg-accent-1), transparent),
+      radial-gradient(600px 320px at -10% 20%, var(--bg-accent-2), transparent),
+      var(--bg);
+    line-height: 1.6;
+    font-size: 15.5px;
+  }
+
+  a.back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: color 0.15s ease;
+  }
+  a.back:hover { color: var(--accent); }
+
+  .eyebrow {
+    margin: 0 0 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0 0 28px;
+    font-family: 'Gowun Batang', serif;
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  fieldset {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 22px 20px;
+    margin-bottom: 20px;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  legend {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding: 2px 10px;
+    background: var(--accent-soft);
+    border-radius: 999px;
+  }
+
+  label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 0.9rem; }
+  small.hint { display: block; color: var(--text-muted); font-weight: 400; margin-top: 5px; line-height: 1.5; }
+
+  input[type=text], select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  input[type=text]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .checkbox-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .checkbox-row label { margin: 0; font-weight: 500; }
+  .checkbox-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  button[type=submit] {
+    margin-top: 20px;
+    padding: 12px 26px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff8f2;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 14px 32px -16px rgba(40, 25, 5, 0.22);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  button[type=submit]:hover { background: var(--accent-strong); transform: translateY(-1px); }
+  button[type=submit]:active { transform: translateY(0); }
+
+  .flash {
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+    font-size: 0.92rem;
+    border: 1px solid transparent;
+    border-left-width: 4px;
+  }
+  .flash.success { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+  .flash.error { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); }
 </style>
 </head>
 <body>
   <a class="back" href="/">← 글쓰기로 돌아가기</a>
+  <p class="eyebrow">Autowrite</p>
   <h1>설정</h1>
 
   {% if messages %}
