@@ -126,6 +126,8 @@ def settings_save(
     tistory_category_name: str = Form(""),
     dcinside_gallery_id: str = Form(""),
     dcinside_gallery_type: str = Form("major"),
+    naver_cafe_club_id: str = Form(""),
+    naver_cafe_menu_id: str = Form(""),
     daily_limit: str = Form("N"),  # 체크박스 미체크 시 폼에서 아예 빠지므로 기본값은 "N"
 ):
     cfg = _load_config_safe()
@@ -133,6 +135,8 @@ def settings_save(
     cfg["tistory"]["category_name"] = tistory_category_name.strip()
     cfg["dcinside"]["gallery_id"] = dcinside_gallery_id.strip()
     cfg["dcinside"]["gallery_type"] = dcinside_gallery_type
+    cfg["naver_cafe"]["club_id"] = naver_cafe_club_id.strip()
+    cfg["naver_cafe"]["menu_id"] = naver_cafe_menu_id.strip()
     cfg["daily_limit"] = daily_limit
     save_config(cfg)
     return templates.TemplateResponse(

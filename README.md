@@ -3,7 +3,7 @@
 사용자가 직접 작성한 글(사진 + 텍스트)을 입력하면, 선택한 사이트의 **본인 계정**으로
 그대로 게시해주는 로컬 도구입니다. 글은 AI가 쓰지 않습니다 — 입력한 내용을 그대로 올릴 뿐입니다.
 
-- 대상 사이트: 티스토리, 디시인사이드 (설계상 다른 사이트도 `sites/` 아래에 어댑터만 추가하면 확장 가능)
+- 대상 사이트: 티스토리, 디시인사이드, 네이버 카페 (설계상 다른 사이트도 `sites/` 아래에 어댑터만 추가하면 확장 가능)
 - 계정: 사이트당 본인 계정 1개, 로그인은 쿠키 세션 저장 후 재사용 (비밀번호는 저장하지 않음)
 - 제한: 사이트당 하루 1건만 게시 가능 (자동 강제)
 
@@ -27,12 +27,17 @@ python autowrite.py
 ```json
 {
   "tistory": { "blog_name": "myblog", "category_name": "" },
-  "dcinside": { "gallery_id": "programming", "gallery_type": "major" }
+  "dcinside": { "gallery_id": "programming", "gallery_type": "major" },
+  "naver_cafe": { "club_id": "12345678", "menu_id": "1" }
 }
 ```
 
 - `tistory.blog_name`: `https://{blog_name}.tistory.com` 의 그 이름
 - `dcinside.gallery_id`: 갤러리 주소의 `id` 파라미터. 마이너 갤러리면 `gallery_type`을 `"minor"`로.
+- `naver_cafe.club_id` / `menu_id`: 글을 쓸 게시판으로 들어갔을 때 주소
+  (`cafe.naver.com/ca-fe/cafes/{club_id}/menus/{menu_id}/...`)에서 그대로 확인 가능.
+
+직접 JSON을 편집하는 대신, 4번 실행 후 `/settings` 화면에서 웹 폼으로 채워도 된다.
 
 ## 3. 최초 로그인 (사이트당 1회)
 
@@ -47,6 +52,7 @@ python autowrite.py
 ```bash
 python scripts/login_tistory.py
 python scripts/login_dcinside.py
+python scripts/login_naver_cafe.py
 ```
 
 세션은 `storage/sessions/*.json`에 저장됩니다. 로그아웃되거나 만료되면 다시 실행하세요.
@@ -65,8 +71,14 @@ python autowrite.py
 
 ## 5. 사이트 UI가 바뀌어서 자동화가 깨졌을 때
 
-`sites/tistory.py`, `sites/dcinside.py` 상단의 `DEFAULT_SELECTORS`가 실제 사이트 구조와
-어긋나면 해당 단계에서 에러가 나고 `storage/error_screenshots/`에 스크린샷이 저장됩니다.
+`sites/tistory.py`, `sites/dcinside.py`, `sites/naver_cafe.py` 상단의 `DEFAULT_SELECTORS`가
+실제 사이트 구조와 어긋나면 해당 단계에서 에러가 나고 `storage/error_screenshots/`에
+스크린샷이 저장됩니다.
+
+> **네이버 카페는 동작 방식이 조금 다릅니다**: 네이버 카페 에디터(SmartEditor ONE)는 완성된
+> 글을 한 번에 통째로 집어넣는 방식이 통하지 않아서, 실제 사람이 타이핑하듯 문단/사진을
+> 순서대로 하나씩 입력합니다(굵게·기울임 서식은 유지되지만, 링크나 글머리 기호 같은 일부
+> 서식은 단순화됩니다). 실제 계정으로 등록 직전까지 동작을 확인했습니다.
 
 고치는 방법:
 1. 어댑터 생성 시 `debug=True`로 넘기면 Playwright Inspector가 열려 실제 셀렉터를 확인하며 단계별로 진행할 수 있습니다.
@@ -97,10 +109,14 @@ sites/
   base.py              공통 어댑터 인터페이스 (로그인 세션, 에러 스크린샷 등)
   tistory.py            티스토리 어댑터
   dcinside.py            디시인사이드 어댑터
+  naver_cafe.py          네이버 카페 어댑터
 scripts/
   login_tistory.py       최초 로그인용
   login_dcinside.py       최초 로그인용
-templates/index.html     웹 UI
+  login_naver_cafe.py     최초 로그인용
+templates/
+  index.html              웹 UI (글쓰기)
+  settings.html            웹 UI (설정)
 build.spec             exe 빌드용 PyInstaller 스펙 (7번 참고)
 storage/
   sessions/               사이트별 로그인 세션(쿠키) 저장

@@ -63,6 +63,21 @@
     </fieldset>
 
     <fieldset>
+      <legend>네이버 카페</legend>
+      <label for="naver_cafe_club_id">카페 club_id</label>
+      <input type="text" id="naver_cafe_club_id" name="naver_cafe_club_id"
+             value="{{ '' if '여기에' in cfg.naver_cafe.club_id else cfg.naver_cafe.club_id }}"
+             placeholder="예: 12345678">
+      <small class="hint">카페 안에서 아무 게시판이나 들어가면 주소의 cafes/ 뒤에 오는 숫자입니다. (cafe.naver.com/ca-fe/cafes/12345678/...)</small>
+
+      <label for="naver_cafe_menu_id">게시판 menu_id</label>
+      <input type="text" id="naver_cafe_menu_id" name="naver_cafe_menu_id"
+             value="{{ '' if '여기에' in cfg.naver_cafe.menu_id else cfg.naver_cafe.menu_id }}"
+             placeholder="예: 1">
+      <small class="hint">글을 올릴 게시판으로 들어가면 주소의 menus/ 뒤에 오는 숫자입니다.</small>
+    </fieldset>
+
+    <fieldset>
       <legend>게시 제한</legend>
       <div class="checkbox-row">
         <input type="checkbox" id="daily_limit" name="daily_limit" value="Y" {% if cfg.daily_limit != "N" %}checked{% endif %}>

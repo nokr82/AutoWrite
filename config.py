@@ -34,6 +34,12 @@ DEFAULT_CONFIG = {
         # 마이너 갤러리면 "minor", 정식 갤러리면 "major"
         "gallery_type": "major",
     },
+    "naver_cafe": {
+        # 카페 접속 시 주소의 숫자 ID. 예: cafe.naver.com/ca-fe/cafes/12345678/... 의 12345678
+        "club_id": "여기에_카페_club_id_입력",
+        # 게시판(메뉴) ID. 카페에서 글을 쓸 게시판으로 들어가면 주소의 menus/ 뒤에 오는 숫자
+        "menu_id": "여기에_게시판_menu_id_입력",
+    },
     # 사이트별 셀렉터를 덮어쓰고 싶을 때 사용 (사이트 개편으로 셀렉터가 깨졌을 때 여기만 수정)
     "selectors": {},
 }
@@ -47,7 +53,19 @@ def load_config() -> dict:
             f"{CONFIG_PATH} 파일을 열어 blog_name, gallery_id 등을 채운 뒤 다시 실행하세요."
         )
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        cfg = json.load(f)
+
+    # naver_cafe 지원처럼 나중에 새 사이트/설정 키가 추가되면, 이전에 생성된 config.json에는
+    # 그 키가 없다. 없는 최상위 키만 기본값으로 채워서 이전 설정 파일도 그대로 쓸 수 있게 한다.
+    changed = False
+    for key, default_value in DEFAULT_CONFIG.items():
+        if key not in cfg:
+            cfg[key] = default_value
+            changed = True
+    if changed:
+        save_config(cfg)
+
+    return cfg
 
 
 def save_config(cfg: dict) -> None:

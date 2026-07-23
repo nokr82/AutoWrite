@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-사용자가 직접 작성한 글(사진 + 텍스트)을 입력하면 선택한 사이트(티스토리, 디시인사이드)의
-**본인 계정**으로 그대로 게시해주는 로컬 FastAPI 웹앱. 글쓰기 자체는 AI가 하지 않으며,
+사용자가 직접 작성한 글(사진 + 텍스트)을 입력하면 선택한 사이트(티스토리, 디시인사이드,
+네이버 카페)의 **본인 계정**으로 그대로 게시해주는 로컬 FastAPI 웹앱. 글쓰기 자체는 AI가 하지 않으며,
 사용자가 입력한 내용을 Playwright로 브라우저를 조작해 그대로 업로드하는 역할만 한다.
 일반 사용자에게 배포하기 위해 PyInstaller로 단일 exe(Windows)로도 패키징할 수 있다.
 
@@ -22,6 +22,7 @@ python autowrite.py
 # 로그인(터미널 방식) — 웹 UI의 "로그인하기" 버튼으로도 가능(아래 아키텍처 참고)
 python scripts/login_tistory.py
 python scripts/login_dcinside.py
+python scripts/login_naver_cafe.py
 
 # exe로 빌드 (dist/AutoWrite.exe 하나만 생성됨, Windows 대상)
 pip install pyinstaller
@@ -43,13 +44,19 @@ pyinstaller build.spec
 `config.json`은 `.gitignore`에 포함되어 커밋되지 않는다. `BASE_DIR`은 `sys.frozen` 여부로
 분기한다 — exe(onefile)로 실행 중이면 `sys.executable`의 부모 폴더(exe 파일이 실제로 있는 곳)를,
 아니면 이 파일의 부모 폴더를 쓴다. onefile은 `__file__`이 실행마다 사라지는 임시 폴더를
-가리키므로, 이 분기가 없으면 exe 재시작 때마다 설정이 날아간다.
+가리키므로, 이 분기가 없으면 exe 재시작 때마다 설정이 날아간다. `load_config()`는 기존
+`config.json`에 없는 최상위 키(예: 나중에 추가된 `naver_cafe`)를 `DEFAULT_CONFIG` 값으로
+채워 자동 저장한다 — 새 사이트가 추가돼도 이전에 생성된 `config.json`을 쓰는 사용자가
+설정 화면(`cfg.naver_cafe.club_id` 등)에서 에러 없이 계속 쓸 수 있게 하기 위함.
 
 **어댑터 패턴(`sites/`)**: `sites/base.py`의 `SiteAdapter` 추상 클래스가 로그인 세션 저장/재사용,
 게시 시 에러 스크린샷 저장(`storage/error_screenshots/`) 등 공통 로직을 담당하고,
-각 사이트(`sites/tistory.py`, `sites/dcinside.py`)는 `login_url` 프로퍼티와 `_do_post()`
-메서드만 구현하면 된다. 새 사이트를 추가하려면 이 인터페이스를 상속한 어댑터를 만들고
-`sites/__init__.py`의 `SITE_ADAPTERS` 딕셔너리에 등록하기만 하면 된다.
+각 사이트(`sites/tistory.py`, `sites/dcinside.py`, `sites/naver_cafe.py`)는 `login_url`
+프로퍼티와 `_do_post()` 메서드만 구현하면 된다. 새 사이트를 추가하려면 이 인터페이스를
+상속한 어댑터를 만들고 `sites/__init__.py`의 `SITE_ADAPTERS` 딕셔너리에 등록하기만 하면
+된다 — 등록만 하면 `templates/index.html`의 사이트 목록, 로그인 버튼, `/post` 처리까지
+전부 자동으로 반영된다(`autowrite.py`가 `SITE_ADAPTERS`를 순회하는 구조라 사이트별 분기가
+따로 없음).
 
 - 로그인은 Playwright의 `context.storage_state()`로 쿠키 세션만 저장하고 재사용한다
   (비밀번호 미저장). 세션 파일: `storage/sessions/{site_id}.json`.
@@ -59,14 +66,26 @@ pyinstaller build.spec
 - 각 어댑터 생성자에 `debug=True`를 넘기면 `page.pause()`로 Playwright Inspector가 열려
   실제 셀렉터를 단계별로 확인할 수 있다. 셀렉터가 깨졌을 때의 표준 디버깅 절차.
 - 에디터별로 본문 삽입 방식이 다르다: 티스토리는 TinyMCE(`window.tinymce.activeEditor.setContent()`),
-  디시인사이드는 Summernote(`$('#memo').summernote('code', html)`). 둘 다 버튼 클릭으로
-  HTML 모드를 여는 방식이 아니라 JS API로 직접 주입하는 방식이 안정적임이 확인되어 있다.
-- 이미지 처리 흐름: 웹 UI 에디터(Summernote, `templates/index.html`)가 사진을 base64 `<img>`로
-  전송 → `autowrite.py`의 `_extract_embedded_images()`가 이를 실제 파일로 빼내고
-  `__AUTOWRITE_IMAGE_{n}__` 자리표시자로 치환 → 각 어댑터가 이미지를 실제로 하나씩 업로드해서
-  사이트가 만들어준 진짜 태그(티스토리는 `[##_Image|...|_##]` 숏코드, 디시인사이드는 실제
-  `<img src="https://dcimg...">`)를 받아온 뒤 → 자리표시자를 순서대로 치환해 서식과 사진
-  위치를 그대로 유지한 최종 HTML을 만든다.
+  디시인사이드는 Summernote(`$('#memo').summernote('code', html)`) — 둘 다 완성된 HTML을
+  한 번에 통째로 주입하는 방식이 안정적임이 확인되어 있다. **네이버 카페(SmartEditor ONE)는
+  이 방식이 통하지 않는다** — 제목은 contenteditable이 아니라 평범한 `textarea.textarea_input`
+  이고, 본문은 문단/이미지가 각각 독립된 "컴포넌트"로 관리되는 구조라 클립보드 `paste`
+  이벤트를 합성해서 던져도 무시된다(실측 결과 DOM에 전혀 반영 안 됨). 대신 실제 사용자처럼
+  `page.keyboard.type()`으로 타이핑하고 `Enter`/`Control+B`/`Control+I`로 문단·서식을
+  반영하는 방식만 통한다 — `sites/naver_cafe.py`의 `_BodyOpsParser`(`html.parser.HTMLParser`
+  기반)가 본문 HTML을 (텍스트 타이핑 / 문단 나누기 / 이미지 삽입) 순서열로 변환하고
+  `_type_body()`가 이를 그대로 재생한다. 등록 버튼도 `<button>`이 아니라
+  `<a role="button">`이라 `page.get_by_role("button", name="등록", exact=True)`처럼
+  접근성 role 기반으로 찾아야 한다("임시등록" 버튼과 이름이 겹치므로 `exact=True` 필수).
+- 이미지 처리 흐름은 사이트마다 다르다. 티스토리/디시인사이드는 자리표시자
+  (`__AUTOWRITE_IMAGE_{n}__`) 방식 — 이미지를 먼저 다 업로드해서 사이트가 만들어준 진짜
+  태그(티스토리는 `[##_Image|...|_##]` 숏코드, 디시인사이드는 실제 `<img src="...">`,
+  업로드 전/후 내용을 비교해 새로 생긴 태그를 찾음)를 받아온 뒤, 한 번에 완성된 HTML을
+  주입할 때 자리표시자를 그 태그로 치환한다. 네이버 카페는 애초에 한 번에 주입하는 게
+  불가능하므로 자리표시자 방식을 안 쓴다 — `_BodyOpsParser`가 본문을 순서대로 훑다가
+  이미지 자리(`<img src="__AUTOWRITE_IMAGE_n__">`)를 만나면 그 즉시 커서 위치에 업로드한다.
+  실측 결과 이미지 업로드가 끝나면 에디터가 알아서 새 빈 문단을 만들고 포커스도 그리로
+  옮겨줘서, 별도 클릭 없이 바로 다음 텍스트를 이어 타이핑해도 순서가 그대로 유지된다.
 
 **터미널 없는 로그인 플로우**: `SiteAdapter.login_manually(wait_for_user=None)`은 로그인
 브라우저를 띄운 뒤 로그인 완료 신호를 기다린다. 인자를 안 주면(터미널에서
@@ -90,7 +109,8 @@ pyinstaller build.spec
   처리하며 사이트별 성공/실패 메시지를 모아 다시 렌더링한다.
 - `POST /login/{site_id}`, `POST /login/{site_id}/confirm`: 위 "터미널 없는 로그인 플로우" 참고.
 - `GET/POST /settings`: `config.json`을 웹 폼으로 읽고 쓴다(블로그 이름/카테고리/갤러리 ID·종류/
-  일일 제한). `selectors` 같은 고급 설정은 이 화면에 노출하지 않고 그대로 보존한다.
+  네이버 카페 club_id·menu_id/일일 제한). `selectors` 같은 고급 설정은 이 화면에 노출하지
+  않고 그대로 보존한다.
 - `_resource_path()`: `templates/`처럼 읽기 전용으로 번들된 리소스의 경로를 구한다. exe로
   실행 중이면 PyInstaller가 풀어놓은 `sys._MEIPASS`(실행마다 새로 생기는 임시 폴더) 기준,
   아니면 이 파일 기준. `config.BASE_DIR`(영속 데이터용, exe 폴더 기준)과는 용도가 다르므로
