@@ -10,3 +10,6 @@ storage/
 
 # 블로그 이름/갤러리ID 등 개인 설정. 없으면 앱 최초 실행 시 자동으로 템플릿이 생성됨
 config.json
+
+# 최초 실행 시 자동으로 내려받는 Chromium 브라우저 (exe 옆 고정 폴더에 저장)
+browsers/

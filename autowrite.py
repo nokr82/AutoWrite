@@ -10,11 +10,20 @@
 from __future__ import annotations
 
 import base64
+import os
 import re
 import sys
 import threading
 import uuid
 from pathlib import Path
+
+from config import BROWSERS_DIR
+
+# Chromium 저장 위치를 exe 옆 고정 폴더로 강제한다. playwright를 import하는 그 무엇보다도
+# (sites 패키지든, 아래 _ensure_chromium_installed의 지역 import든) 먼저 설정해야 한다 —
+# 안 그러면 onefile exe가 실행마다 새로 만드는 임시 폴더(_MEIPASS) 밑을 기본값으로 써서,
+# 실행할 때마다 브라우저를 다시 받아야 하고 다운로드 도중엔 "Executable doesn't exist" 에러가 난다.
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(BROWSERS_DIR))
 
 if sys.platform == "win32":
     # 한국어 Windows 콘솔 기본 코드페이지(cp949)와 이 파일의 UTF-8 문자열이 어긋나면

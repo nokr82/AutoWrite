@@ -20,6 +20,12 @@ SESSION_DIR = BASE_DIR / "storage" / "sessions"
 UPLOAD_DIR = BASE_DIR / "storage" / "uploads"
 POST_LOG_PATH = BASE_DIR / "storage" / "post_log.json"
 DRAFTS_PATH = BASE_DIR / "storage" / "drafts.json"
+# Playwright가 내려받는 Chromium 브라우저 본체를 저장할 위치. exe 옆 고정 폴더로 지정하지
+# 않으면, onefile exe는 실행할 때마다 새로 생기는 임시 폴더(_MEIPASS) 기준으로 브라우저를
+# 찾으려 해서 실행할 때마다 다시 받아야 하고, 다운로드가 끝나기 전에 브라우저를 띄우면
+# "Executable doesn't exist" 에러가 난다. autowrite.py가 다른 import보다 먼저
+# os.environ["PLAYWRIGHT_BROWSERS_PATH"]를 이 값으로 설정해야 한다.
+BROWSERS_DIR = BASE_DIR / "browsers"
 
 DEFAULT_CONFIG = {
     # "Y"면 사이트당 하루 1건 제한을 적용, "N"이면 제한 없이 몇 번이든 게시 가능.
