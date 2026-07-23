@@ -30,6 +30,17 @@
   .login-confirm-btn:hover { background: #bdeecb; }
   .login-confirm-btn:disabled { border-color: #ccc; color: #999; cursor: not-allowed; background: #f5f5f5; }
   .login-status { font-size: 0.8rem; color: #666; margin-left: 4px; }
+  .draft-list { display: flex; flex-direction: column; gap: 6px; }
+  .draft-row { display: flex; align-items: center; gap: 8px; }
+  .draft-load-btn { flex: 1; text-align: left; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; cursor: pointer; font-size: 0.9rem; }
+  .draft-load-btn:hover { background: #f0f0f0; }
+  .draft-title { font-weight: 500; }
+  .draft-time { color: #999; font-size: 0.8rem; margin-left: 8px; }
+  .draft-delete-btn { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; color: #a11; cursor: pointer; font-size: 0.85rem; }
+  .draft-delete-btn:hover { background: #fde2e2; }
+  .draft-empty { color: #999; font-size: 0.9rem; }
+  #save-draft-btn { margin-top: 16px; margin-right: 8px; padding: 10px 20px; font-size: 1rem; border: 1px solid #222; border-radius: 6px; background: #fff; color: #222; cursor: pointer; }
+  #save-draft-btn:hover { background: #f0f0f0; }
 </style>
 </head>
 <body>
@@ -40,6 +51,23 @@
       <div class="flash {{ msg.level }}">{{ msg.text | safe }}</div>
     {% endfor %}
   {% endif %}
+
+  <fieldset>
+    <legend>저장된 글 (최대 5개)</legend>
+    <div class="draft-list" id="draft-list">
+      {% for draft in drafts %}
+        <div class="draft-row" data-draft-row="{{ draft.id }}">
+          <button type="button" class="draft-load-btn" data-draft-id="{{ draft.id }}">
+            <span class="draft-title">{{ draft.title or "(제목 없음)" }}</span>
+            <span class="draft-time">{{ draft.saved_at }}</span>
+          </button>
+          <button type="button" class="draft-delete-btn" data-draft-id="{{ draft.id }}">삭제</button>
+        </div>
+      {% else %}
+        <div class="draft-empty" id="draft-empty">저장한 글이 없습니다.</div>
+      {% endfor %}
+    </div>
+  </fieldset>
 
   <form action="/post" method="post" id="post-form">
     <fieldset>
@@ -79,6 +107,7 @@
       {% endfor %}
     </fieldset>
 
+    <button type="button" id="save-draft-btn">게시글 저장</button>
     <button type="submit" id="submit-btn">선택한 사이트에 게시</button>
   </form>
 
@@ -165,6 +194,83 @@
           status.text('확인 요청에 실패했습니다. 다시 시도해주세요.');
           btn.prop('disabled', false);
         });
+      });
+
+      // 저장된 글(임시 저장) 관련 — 같은 글을 다시 쓸 필요 없이 목록에서 눌러 그대로 불러온다.
+      function escapeHtml(s) {
+        return $('<div>').text(s == null ? '' : s).html();
+      }
+
+      function renderDraftList(draftList) {
+        const list = $('#draft-list');
+        list.empty();
+        if (!draftList.length) {
+          list.append('<div class="draft-empty" id="draft-empty">저장한 글이 없습니다.</div>');
+          return;
+        }
+        draftList.forEach((d) => {
+          const title = escapeHtml(d.title) || '(제목 없음)';
+          const row = $(`
+            <div class="draft-row" data-draft-row="${d.id}">
+              <button type="button" class="draft-load-btn" data-draft-id="${d.id}">
+                <span class="draft-title">${title}</span>
+                <span class="draft-time">${escapeHtml(d.saved_at)}</span>
+              </button>
+              <button type="button" class="draft-delete-btn" data-draft-id="${d.id}">삭제</button>
+            </div>
+          `);
+          list.append(row);
+        });
+      }
+
+      // 저장된 글 목록에서 하나를 누르면 제목/본문을 그대로 불러온다.
+      $('#draft-list').on('click', '.draft-load-btn', function () {
+        const draftId = $(this).data('draft-id');
+        fetch(`/drafts/${draftId}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (!data.ok) {
+              alert(data.error || '불러오기에 실패했습니다.');
+              return;
+            }
+            $('#title').val(data.draft.title);
+            $('#editor').summernote('code', data.draft.content);
+          })
+          .catch(() => alert('저장된 글을 불러오는 중 오류가 발생했습니다.'));
+      });
+
+      $('#draft-list').on('click', '.draft-delete-btn', function () {
+        const draftId = $(this).data('draft-id');
+        fetch(`/drafts/${draftId}/delete`, { method: 'POST' })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.ok) renderDraftList(data.drafts);
+          })
+          .catch(() => alert('삭제 중 오류가 발생했습니다.'));
+      });
+
+      // '임시 저장' 버튼 — 현재 작성 중인 제목/본문을 최대 5개까지 저장해둔다
+      // (5개를 넘으면 서버에서 가장 오래된 것부터 지운다).
+      $('#save-draft-btn').on('click', function () {
+        const btn = $(this);
+        const title = $('#title').val();
+        const content = $('#editor').summernote('code');
+
+        btn.prop('disabled', true);
+        fetch('/drafts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ title, content }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            btn.prop('disabled', false);
+            if (data.ok) renderDraftList(data.drafts);
+          })
+          .catch(() => {
+            btn.prop('disabled', false);
+            alert('게시글 저장 중 오류가 발생했습니다.');
+          });
       });
     });
   </script>

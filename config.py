@@ -19,6 +19,7 @@ CONFIG_PATH = BASE_DIR / "config.json"
 SESSION_DIR = BASE_DIR / "storage" / "sessions"
 UPLOAD_DIR = BASE_DIR / "storage" / "uploads"
 POST_LOG_PATH = BASE_DIR / "storage" / "post_log.json"
+DRAFTS_PATH = BASE_DIR / "storage" / "drafts.json"
 
 DEFAULT_CONFIG = {
     # "Y"면 사이트당 하루 1건 제한을 적용, "N"이면 제한 없이 몇 번이든 게시 가능.

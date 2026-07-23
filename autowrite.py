@@ -31,6 +31,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from config import SESSION_DIR, UPLOAD_DIR, load_config, save_config
+from drafts import delete_draft, get_draft, list_drafts, save_draft
 from postlog import can_post_today, mark_posted
 from sites import SITE_ADAPTERS, PostContent
 
@@ -96,7 +97,7 @@ def _site_status() -> list[dict]:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse(
-        request, "index.html", {"sites": _site_status(), "messages": []}
+        request, "index.html", {"sites": _site_status(), "messages": [], "drafts": list_drafts()}
     )
 
 
@@ -210,7 +211,9 @@ def post(
     if not sites:
         messages.append({"level": "error", "text": "게시할 사이트를 하나 이상 선택하세요."})
         return templates.TemplateResponse(
-            request, "index.html", {"sites": _site_status(), "messages": messages}
+            request,
+            "index.html",
+            {"sites": _site_status(), "messages": messages, "drafts": list_drafts()},
         )
 
     # 에디터가 사진을 base64로 담아 보낸 <img>를 실제 파일로 빼내고 자리표시자로 치환
@@ -245,8 +248,32 @@ def post(
             messages.append({"level": "error", "text": f"[{adapter.site_name}] 게시 실패: {e}"})
 
     return templates.TemplateResponse(
-        request, "index.html", {"sites": _site_status(), "messages": messages}
+        request,
+        "index.html",
+        {"sites": _site_status(), "messages": messages, "drafts": list_drafts()},
     )
+
+
+@app.post("/drafts")
+def create_draft(title: str = Form(""), content: str = Form("")):
+    """'임시 저장' 버튼이 호출한다. 최대 5개까지만 보관되고 넘으면 가장 오래된 것부터 지워진다."""
+    save_draft(title, content)
+    return JSONResponse({"ok": True, "drafts": list_drafts()})
+
+
+@app.get("/drafts/{draft_id}")
+def read_draft(draft_id: str):
+    """저장된 글 목록에서 하나를 눌렀을 때 제목/본문을 돌려준다 (에디터에 그대로 채워넣기 위함)."""
+    draft = get_draft(draft_id)
+    if draft is None:
+        return JSONResponse({"ok": False, "error": "찾을 수 없는 임시 저장 글입니다."}, status_code=404)
+    return JSONResponse({"ok": True, "draft": draft})
+
+
+@app.post("/drafts/{draft_id}/delete")
+def remove_draft(draft_id: str):
+    delete_draft(draft_id)
+    return JSONResponse({"ok": True, "drafts": list_drafts()})
 
 
 def _ensure_chromium_installed() -> None:
